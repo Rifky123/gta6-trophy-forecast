@@ -389,7 +389,10 @@ def forecast_rich(case, states, target_t):
                 carry = share * (0.3 + 0.4 * rng.random())
                 hz = max(0.0, e_now / max(P_now, 1.0) / HOURS_PER_DAY) * (0.5 + rng.random())
                 pool.append(e_now + carry * dp_target + hz * decay_int * HOURS_PER_DAY)
-        lam_pools.append([max(x, 0.05) for x in pool])
+        # A trophy the page has never shown anyone earning still gains its first earners in a
+        # week of a launch this size, so its count floor sits above zero.
+        floor = 0.05 if e_now >= 0.5 else 1.2
+        lam_pools.append([max(x, floor) for x in pool])
 
     auto = auto_index(now["rates"])
     samples = [[] for _ in range(n_trophy)]
