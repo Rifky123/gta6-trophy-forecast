@@ -277,8 +277,14 @@ def fit_carry_hazard(pts):
     return (min(1.0, max(0.0, c)), max(0.0, h))
 
 
-def trophy_intervals(states, idx):
-    """Per-state-interval (dp, pbar*dt, dE) rows for trophy idx."""
+def trophy_intervals(states, idx, tau_h_hours=TAU_H_DAYS * HOURS_PER_DAY):
+    """Per-state-interval (dP, X, dE) rows for trophy idx.
+
+    X is the players-hour exposure an interval gives to a hazard whose base is measured at the
+    first state: P_mid * dt * exp(-t_mid/tau). Regressing dE against X gives h0, the hazard at the
+    series' start, which the forecast then decays to the target — not an average hazard that a
+    late case would wrongly apply at full strength for another week.
+    """
     pts = []
     for k in range(1, len(states)):
         a, b = states[k - 1], states[k]
@@ -287,7 +293,9 @@ def trophy_intervals(states, idx):
             continue
         ea = a["rates"][idx] * a["players"] / 100.0
         eb = b["rates"][idx] * b["players"] / 100.0
-        pts.append((b["players"] - a["players"], 0.5 * (a["players"] + b["players"]) * dt, eb - ea))
+        t_mid = 0.5 * (a["t"] + b["t"])
+        exposure = 0.5 * (a["players"] + b["players"]) * dt * math.exp(-t_mid / tau_h_hours)
+        pts.append((b["players"] - a["players"], exposure, eb - ea))
     return pts
 
 
