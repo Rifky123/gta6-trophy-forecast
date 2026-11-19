@@ -56,7 +56,7 @@ STALE_GAP_MIN_HOURS = 1.5
 # and stops re-earning; entrant carry (which rides the players curve) takes over.
 TAU_H_DAYS = 3.0
 # Entrant-carry share floor: a fresh entrant is unlikely to hold much beyond the automatic trophy.
-CARRY_DAMP = 0.03
+CARRY_DAMP = 0.02
 
 HOURS_PER_DAY = 24.0
 
@@ -410,7 +410,7 @@ def forecast_stale(case, states, target_t):
         after = [p for p in pts if p[0] >= t_last + LAUNCH_REFRESH_AFTER_HOURS]
         if after and target_t >= after[0][0] - 0.5:
             mu_lnP = after[0][1]
-            sd_P = 0.10
+            sd_P = 0.08
         else:
             mu_lnP = pts[0][1]
             sd_P = 0.45
@@ -464,7 +464,7 @@ def forecast_stale(case, states, target_t):
             if i == auto:
                 samples[i].append(100.0)
                 continue
-            lam = E_mu[i] * math.exp(0.40 * rng.gauss(0.0, 1.0))
+            lam = E_mu[i] * math.exp(0.30 * rng.gauss(0.0, 1.0))
             e_draw = poisson_draw(rng, lam)
             rate = 100.0 * e_draw / p_draw
             if rate > 100.0:
