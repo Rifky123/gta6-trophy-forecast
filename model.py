@@ -208,7 +208,12 @@ def p_families(t, y, w):
 
 
 def p_spread(t, y, w, target_t, rng, reps=BOOTSTRAP_REPS):
-    """Refit the families on residual bootstrap replicates; return the spread of the blend at T."""
+    """Refit the families on residual bootstrap replicates; return the within-family spread.
+
+    The spread of each family's own prediction at the target: refit noise plus that family's
+    residual sd. The disagreement between families is carried by sampling every family in the
+    forecast loop, so it is deliberately left out here — counting it again would double it.
+    """
     if len(t) < 4:
         return 0.0
     fams = p_families(t, y, w)
@@ -234,10 +239,10 @@ def p_spread(t, y, w, target_t, rng, reps=BOOTSTRAP_REPS):
         return 0.0
     mean = sum(preds) / len(preds)
     var = sum((p - mean) ** 2 for p in preds) / (len(preds) - 1)
-    centers = [fn(target_t) for wt, fn, sd in fams]
-    cmean = sum(wt * c for (wt, fn, sd), c in zip(fams, centers))
-    cvar = sum(wt * (c - cmean) ** 2 for (wt, fn, sd), c in zip(fams, centers))
-    return math.sqrt(var + cvar)
+    # The families' own residual sds, averaged, keep each family's draw honest when the refits
+    # move less than the fit's noise floor.
+    resid_sd = sum(sd * wt for wt, fn, sd in fams)
+    return max(math.sqrt(var), resid_sd)
 
 
 # ---------------------------------------------------------------------------
