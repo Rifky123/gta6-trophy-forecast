@@ -439,12 +439,21 @@ def forecast_stale(case, states, target_t):
         mu_lnP = pts[0][1]
         sd_P = 0.5
     elif target_t >= pts[-1][0]:
-        (t1, y1), (t2, y2) = pts[-2], pts[-1]
-        slope = (y2 - y1) / max(t2 - t1, 0.25)
-        gap = target_t - t2
-        damp = math.exp(-gap / (TAU_H_DAYS * HOURS_PER_DAY))
-        mu_lnP = y2 + slope * (TAU_H_DAYS * HOURS_PER_DAY) * (1.0 - damp)
-        sd_P = 0.35 + 0.08 * math.sqrt(max(gap, 1.0))
+        # Extrapolate with the same family blend the rich branch uses: a damped last-slope
+        # alone grows without bound over a week, while the blend's saturating voice keeps it
+        # anchored to what a crawler's tracked-player base plausibly reaches.
+        fams_a = p_families([p[0] for p in pts], [p[1] for p in pts], [1.0] * len(pts))
+        if fams_a:
+            mu_lnP = sum(wt * fn(target_t) for wt, fn, sd in fams_a)
+            spread = math.sqrt(sum(wt * (fn(target_t) - mu_lnP) ** 2 for wt, fn, sd in fams_a))
+            sd_P = max(0.35, spread)
+        else:
+            (t1, y1), (t2, y2) = pts[-2], pts[-1]
+            slope = (y2 - y1) / max(t2 - t1, 0.25)
+            gap = target_t - t2
+            mu_lnP = y2 + slope * TAU_H_DAYS * HOURS_PER_DAY * (1.0 - math.exp(-gap / (TAU_H_DAYS * HOURS_PER_DAY)))
+            sd_P = 0.35 + 0.08 * math.sqrt(max(gap, 1.0))
+        mu_lnP = min(mu_lnP, math.log(2000000.0))
     else:
         mu_lnP = pts[0][1]
         sd_P = 0.3
@@ -464,7 +473,10 @@ def forecast_stale(case, states, target_t):
     for r in rates_last:
         if r < 99.0 and r > 0:
             share_sum += r
-    prog_total = max(target_t - max(t_last, 0.0), 0.5) * 22.0 * (P_last / 638.0) ** 0.35
+    # Launch-night progression beyond the automatic trophy was ~0.032 extra earns per new
+    # tracked player (the refresh added 3,230 players and 103 earns beyond the automatic one),
+    # so the week's progression scales with the players the page has yet to reveal.
+    prog_total = new_players * 0.032 * (P_last / 638.0) ** 0.35
     E_mu = []
     for i in range(n_trophy):
         e = E_last[i]
