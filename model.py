@@ -46,9 +46,11 @@ SAMPLES_PER_FAMILY = 240
 BOOTSTRAP_REPS = 20
 POISSON_NORMAL_LAMBDA = 30.0
 
-# The stale-page regime: at most this many distinct states, or the page holding one state for at
-# least this share of the history's read span (and at least this many hours).
-STALE_STATES_MAX = 3
+# The stale-page regime: at most two distinct states (a frozen page, or one prior refresh), or
+# the page holding one state for at least this share of the history's read span (and at least
+# this many hours). Three or more states are enough to fit the earner-accumulation regression —
+# that is the final's case even if a refresh has not landed for a while.
+STALE_STATES_MAX = 2
 STALE_GAP_FRACTION = 0.55
 STALE_GAP_MIN_HOURS = 1.5
 
