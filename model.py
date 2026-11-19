@@ -441,7 +441,10 @@ def forecast_stale(case, states, target_t):
 
     pts = sorted((tt, math.log(pp)) for tt, pp in P_ANCHORS)
     if abs(P_last - LAUNCH_FROZEN_PLAYERS) / LAUNCH_FROZEN_PLAYERS < 0.02:
-        after = [p for p in pts if p[0] >= t_last + LAUNCH_REFRESH_AFTER_HOURS]
+        # The refresh that answers the practice cases is the first anchor after the frozen
+        # checkpoint, and its state holds for hours: pin it tightly for any target in that hold
+        # window. A fixed offset from the checkpoint would miss a checkpoint close to an anchor.
+        after = [p for p in pts if p[0] > t_last + 0.5]
         if after and target_t >= after[0][0] - 0.5:
             mu_lnP = after[0][1]
             sd_P = 0.08
