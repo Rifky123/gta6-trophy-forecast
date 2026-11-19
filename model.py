@@ -189,7 +189,9 @@ def p_families(t, y, w):
         sse, k, a, b, tau = best_sat
         fits.append((sse, k, (lambda tt, a=a, b=b, tau=tau: a + b * (1.0 - math.exp(-max(tt, 0.0) / tau)))))
     f3 = quad_fit(x_log, y, w)
-    if f3:
+    if f3 and f3[2] <= 0.0:
+        # Only a decelerating quadratic (c <= 0) is admissible: the crawler's growth bends down,
+        # never up.
         a, b, c, sse, k = f3
         fits.append((sse, k - 3, (lambda tt, a=a, b=b, c=c: a + b * math.log(1.0 + max(tt, 0.0)) + c * math.log(1.0 + max(tt, 0.0)) ** 2)))
     if not fits:
@@ -354,9 +356,19 @@ def forecast_rich(case, states, target_t):
         e_now = now["rates"][i] * P_now / 100.0
         pts = trophy_intervals(states, i)
         base = fit_carry_hazard(pts)
+        # The structural prior the regression shrinks toward when the trophy's counts are too
+        # small for its display rounding to leave a readable signal: carry rides the current
+        # share (damped), the hazard rides the mean per-player earn rate seen over the window.
+        share = min(now["rates"][i] / 100.0, 1.0)
+        window_hours = max(now_t - states[0]["t"], 1.0)
+        prior_c = share * CARRY_DAMP * 10.0
+        prior_h = max(sum(p[2] for p in pts) / max(sum(p[1] for p in pts), 1.0), 0.0)
+        w_prior = 1.0 / (1.0 + e_now / 6.0)
         pool = []
         if base is not None and len(pts) >= 3:
             c, h = base
+            c = c * (1.0 - w_prior) + prior_c * w_prior
+            h = h * (1.0 - w_prior) + prior_h * w_prior
             pool.append(e_now + c * dp_target + h * decay_int)
             for _ in range(BOOTSTRAP_REPS):
                 resample = [pts[rng.randrange(len(pts))] for _ in range(len(pts))]
@@ -364,9 +376,10 @@ def forecast_rich(case, states, target_t):
                 if ch is None:
                     continue
                 cb, hb = ch
+                cb = cb * (1.0 - w_prior) + prior_c * w_prior
+                hb = hb * (1.0 - w_prior) + prior_h * w_prior
                 pool.append(e_now + cb * dp_target + hb * decay_int)
         else:
-            share = min(now["rates"][i] / 100.0, 1.0)
             for _ in range(BOOTSTRAP_REPS):
                 carry = share * (0.3 + 0.4 * rng.random())
                 hz = max(0.0, e_now / max(P_now, 1.0) / HOURS_PER_DAY) * (0.5 + rng.random())
