@@ -348,8 +348,11 @@ def forecast_rich(case, states, target_t):
     now_t = now["t"]
     P_now = max(now["players"], 1.0)
     tau_h_hours = TAU_H_DAYS * HOURS_PER_DAY
-    # The hazard's decay from now to the target, and the players-hour integral it weights, along
-    # the blended players path.
+    # The hazard fit is h0 at the series' first state (the exposure column in
+    # trophy_intervals is decayed by exp(-t_mid/tau) from that state). So the future
+    # exposure must carry on the same clock: decay from states[0], not from now, or the
+    # late case applies an already-decayed hazard at full strength again.
+    t0 = states[0]["t"]
     seg = 12
     path_t = [now_t + (target_t - now_t) * k / seg for k in range(seg + 1)]
     blend_at = lambda tt: sum(wt * fn(tt) for wt, fn, sd in fams)
@@ -358,7 +361,7 @@ def forecast_rich(case, states, target_t):
     for k in range(seg):
         dt = path_t[k + 1] - path_t[k]
         p_mid = math.exp(0.5 * (path_lnP[k] + path_lnP[k + 1]))
-        decay = math.exp(-((path_t[k] - now_t) + 0.5 * dt) / tau_h_hours)
+        decay = math.exp(-((path_t[k] - t0) + 0.5 * dt) / tau_h_hours)
         decay_int += p_mid * decay * dt
     dp_target = math.exp(blend_at(target_t)) - P_now
 
